@@ -155,6 +155,13 @@ prepare_ort_source() {
 
   local patch
   for patch in "$REPO_ROOT"/patches/*.patch; do
+    if [ "${patch##*/}" = onnxruntime-kleidiai-unused-kernel-name.patch ]; then
+      local kernel_source="$ORT_SOURCE_DIR/onnxruntime/core/mlas/lib/kleidiai/halfgemm_kleidiai.cpp"
+      if [ ! -f "$kernel_source" ] || ! grep -Fq Sve2p1HalfGemmKernelName "$kernel_source"; then
+        log "$(basename "$patch") is not needed for $ORT_REF"
+        continue
+      fi
+    fi
     if git -C "$ORT_SOURCE_DIR" apply --reverse --check "$patch" >/dev/null 2>&1; then
       log "$(basename "$patch") already applied"
     else
