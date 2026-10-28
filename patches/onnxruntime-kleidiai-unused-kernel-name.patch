@@ -2,12 +2,10 @@ diff --git a/onnxruntime/core/mlas/lib/kleidiai/halfgemm_kleidiai.cpp b/onnxrunt
 index 14afd31..18f25b2 100644
 --- a/onnxruntime/core/mlas/lib/kleidiai/halfgemm_kleidiai.cpp
 +++ b/onnxruntime/core/mlas/lib/kleidiai/halfgemm_kleidiai.cpp
-@@ -24,7 +24,7 @@
+@@ -24,5 +24,5 @@
  namespace {
 -constexpr const char* Sve2p1HalfGemmKernelName =
 +[[maybe_unused]] constexpr const char* Sve2p1HalfGemmKernelName =
      "kai_matmul_clamp_f16_f16_f16p16vsx2bf16_6x16vs_sve2p1_dot";
  constexpr size_t Sve2p1PackedRhsMetadataSize = MLAS_DEFAULT_PREFERRED_BUFFER_ALIGNMENT;
  static_assert(sizeof(size_t) <= Sve2p1PackedRhsMetadataSize);
- 
- enum class KaiHalfGemmBackend {
