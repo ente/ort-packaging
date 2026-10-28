@@ -1,6 +1,12 @@
 # Upstream patch inventory
 
-Every patch in `patches/` is applied to the exact upstream commit resolved by the release-candidate workflow. Its preflight job verifies the patches and compiles the portable smoke test against the requested ONNX Runtime release before any platform build starts.
+Applicable patches in `patches/` are applied to the exact upstream commit resolved by the release-candidate workflow. Its preflight job verifies the patches and compiles the portable smoke test against the requested ONNX Runtime release before any platform build starts.
+
+## `onnxruntime-kleidiai-unused-kernel-name.patch`
+
+This patch marks the SVE2.1 half-GEMM kernel name as `[[maybe_unused]]`. ONNX Runtime 1.31.0 references the constant only through optional logging and test hooks, so release builds otherwise fail with Clang's `-Werror,-Wunused-const-variable` diagnostic. Kernel selection and execution are unchanged, and warnings remain errors.
+
+Preflight and platform builds share `prepare_ort_source`, which skips this patch when the upstream source does not contain the constant. This preserves compatibility with older releases. Remove the patch once all supported upstream versions include an equivalent annotation or no longer declare the constant.
 
 ## `onnxruntime-coreml-runtime-availability.patch`
 

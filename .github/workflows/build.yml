@@ -74,12 +74,8 @@ jobs:
           PACKAGE_REVISION: ${{ steps.meta.outputs.package_revision }}
         run: |
           set -euo pipefail
-          [ "$(git -C onnxruntime rev-parse HEAD)" = "$ORT_COMMIT" ]
-          for patch in "$GITHUB_WORKSPACE"/patches/*.patch; do
-            git -C onnxruntime apply --check "$patch"
-            git -C onnxruntime apply "$patch"
-          done
           source scripts/common.sh
+          prepare_ort_source
           if ort_supports_no_telemetry; then
             echo "Upstream build supports --no_telemetry"
           else
