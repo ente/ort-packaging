@@ -7,6 +7,7 @@ $target = if ($args.Count -gt 0) { $args[0] } else { "" }
 if ($target -notin @("windows-x64", "windows-arm64")) {
     throw "usage: test-windows-runtime.ps1 <windows-x64|windows-arm64>"
 }
+$cmakeGenerator = if ($env:CMAKE_GENERATOR) { $env:CMAKE_GENERATOR } else { "Visual Studio 17 2022" }
 
 $ortSource = if ($env:ORT_SOURCE_DIR) { $env:ORT_SOURCE_DIR } else { Join-Path $RepoRoot "onnxruntime" }
 $buildRoot = if ($env:BUILD_ROOT) { $env:BUILD_ROOT } else { Join-Path $RepoRoot "build" }
@@ -24,7 +25,7 @@ foreach ($required in @($packageDir, $headers, $model, $core, $plugin)) {
 Remove-Item $testBuildDir -Recurse -Force -ErrorAction SilentlyContinue
 $architecture = if ($target -eq "windows-arm64") { "ARM64" } else { "x64" }
 cmake -S (Join-Path $RepoRoot "tests") -B $testBuildDir `
-    -G "Visual Studio 17 2022" `
+    -G $cmakeGenerator `
     -A $architecture `
     -D "ORT_INCLUDE_DIR=$headers"
 if ($LASTEXITCODE -ne 0) { throw "failed to configure the Windows runtime smoke test" }

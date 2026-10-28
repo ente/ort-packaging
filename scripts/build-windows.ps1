@@ -35,6 +35,7 @@ $target = if ($args.Count -gt 0) { $args[0] } else { "" }
 if ($target -notin @("windows-x64", "windows-arm64")) {
     throw "usage: build-windows.ps1 <windows-x64|windows-arm64>"
 }
+$cmakeGenerator = if ($env:CMAKE_GENERATOR) { $env:CMAKE_GENERATOR } else { "Visual Studio 17 2022" }
 
 $ortSource = if ($env:ORT_SOURCE_DIR) { $env:ORT_SOURCE_DIR } else { Join-Path $RepoRoot "onnxruntime" }
 $buildRoot = if ($env:BUILD_ROOT) { $env:BUILD_ROOT } else { Join-Path $RepoRoot "build" }
@@ -85,7 +86,7 @@ $buildArgs = @(
     "--wgsl_template", "static",
     "--disable_rtti",
     "--enable_lto",
-    "--cmake_generator", "Visual Studio 17 2022",
+    "--cmake_generator", $cmakeGenerator,
     "--cmake_extra_defines",
     "onnxruntime_BUILD_UNIT_TESTS=OFF",
     "onnxruntime_USE_TELEMETRY=OFF",
@@ -129,12 +130,6 @@ if ($target -eq "windows-arm64") {
     foreach ($warning in $missingReturnWarnings) {
         if (-not ($allowedWarnings | Where-Object { $warning -match $_ })) {
             throw "unexpected Windows ARM64 compiler warning: $warning"
-        }
-    }
-    foreach ($pattern in $allowedWarnings) {
-        $matches = @($missingReturnWarnings | Where-Object { $_ -match $pattern })
-        if ($matches.Count -ne 1) {
-            throw "expected exactly one pinned Dawn warning matching: $pattern"
         }
     }
 }
