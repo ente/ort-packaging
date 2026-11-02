@@ -129,6 +129,7 @@ class CandidateTests(unittest.TestCase):
             env=self.env,
             capture_output=True,
             text=True,
+            check=False,
         )
         self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
         return result
@@ -267,9 +268,9 @@ class ToolTests(unittest.TestCase):
             with (
                 patch.object(module.urllib.request, "urlopen", side_effect=OSError("down")) as call,
                 patch.object(module.time, "sleep"),
+                self.assertRaisesRegex(OSError, "down"),
             ):
-                with self.assertRaisesRegex(OSError, "down"):
-                    module.download("https://fixture.invalid/archive", archive)
+                module.download("https://fixture.invalid/archive", archive)
             self.assertEqual(call.call_count, 3)
 
 
@@ -293,15 +294,18 @@ class SourceTests(unittest.TestCase):
                 "GITHUB_REPOSITORY": "ente/ort-packaging",
             }
             command = ["bash", str(ROOT / "scripts/resolve-release.sh"), "1.31.0", "1"]
-            normal = subprocess.run(command, env=env, capture_output=True, text=True)
+            normal = subprocess.run(command, env=env, capture_output=True, text=True, check=False)
             self.assertNotEqual(normal.returncode, 0)
             self.assertIn("already exists", normal.stderr)
             source = subprocess.run(
-                [*command, "--source-only"], env=env, capture_output=True, text=True
+                [*command, "--source-only"], env=env, capture_output=True, text=True, check=False
             )
             self.assertEqual(source.returncode, 0, source.stderr)
             self.assertIn("ort_commit=" + "b" * 40, source.stdout)
             rejected = subprocess.run(
-                [*command, "--source-only"], env={**env, "PRERELEASE": "1"}, capture_output=True
+                [*command, "--source-only"],
+                env={**env, "PRERELEASE": "1"},
+                capture_output=True,
+                check=False,
             )
             self.assertNotEqual(rejected.returncode, 0)

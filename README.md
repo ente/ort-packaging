@@ -8,22 +8,17 @@ This repository's release tags describe a **custom packaging** of upstream ONNX 
 
 A routine ONNX Runtime release requires no repository changes. Do not edit `build.env` to select an ONNX Runtime version; change it only when the shared build policy or toolchain must change.
 
-Prerequisites:
-
-- The exact packaging code to release is on `main`.
-- The **Validate** workflow for that `main` commit succeeded.
+Make sure the packaging code you want to release is on `main`, then follow these three steps. The workflows enforce every other release requirement and stop if one fails.
 
 ### 1. Build a release candidate
 
-To check an upgrade before merging, select **Mode: trial** and the affected platform or all platforms on your branch. Trials use the release build scripts, may reuse an existing revision and never assemble a publishable candidate. Release candidates require **Mode: release**, **Platform: all** and **Branch: main**.
-
 Open [Build release candidate](https://github.com/ente/ort-packaging/actions/workflows/build.yml), select **Run workflow**, and use:
 
-- **Mode:** `release`
-- **Platform:** `all`
 - **Branch:** `main`
 - **ORT version:** the stable upstream version without a `v` prefix, such as `1.28.1`
 - **Package revision:** `1` for the first package of that ORT version; use the next integer only to correct the packaging. Revisions must be sequential.
+
+Leave the two preselected choices, `release` and `all`, unchanged.
 
 The equivalent CLI command is:
 
@@ -35,15 +30,15 @@ gh workflow run build.yml \
   -f package_revision=1
 ```
 
-The workflow verifies the upstream release, resolves its tag to a commit, applies the repository patches, and builds and tests every package. The candidate is ready only when **Assemble release candidate** succeeds. Candidates expire after 14 days.
+The workflow verifies the upstream release, resolves its tag to a commit, applies the repository patches, and builds and tests every package. The candidate is ready when the run succeeds. If a job fails for a temporary reason, such as a network error, select **Re-run failed jobs** on that run.
 
-### 2. Complete physical-device validation
+### 2. Test on physical devices
 
-Before publishing, check any Windows GPU inference skipped by CI, test Android WebGPU on representative supported physical devices and validate the iOS device slice and vendor-GPU behavior. Hosted CI validates package structure and runtime inference, but it cannot replace these device checks.
+Test Android WebGPU on representative supported physical devices and validate the iOS device slice and vendor-GPU behavior. Hosted CI validates package structure and runtime inference, but it cannot replace these device checks.
 
 ### 3. Publish the candidate
 
-Copy the numeric run ID from the successful candidate build. Open [Publish release](https://github.com/ente/ort-packaging/actions/workflows/publish.yml), select **Run workflow** on `main`, and enter that ID.
+The successful build's summary page shows its run ID. Open [Publish release](https://github.com/ente/ort-packaging/actions/workflows/publish.yml), select **Run workflow** on `main`, and enter that ID.
 
 The equivalent CLI command is:
 
@@ -54,18 +49,23 @@ gh workflow run publish.yml \
   -f build_run_id=123456789
 ```
 
-Publication accepts only a successful `build.yml` run from this repository's `main` branch. It revalidates the candidate provenance, checksums, upstream commit, package revision, and target tag before creating an immutable release from the exact packaging commit that produced the candidate. If the candidate expired, run a new build instead.
-
-### 4. Verify the published release
-
-Confirm that the release:
-
-- uses the tag `ort-<ORT version>-r<package revision>`;
-- is immutable and contains 35 assets;
-- includes 11 packages, their 11 checksum sidecars, their 11 manifests, `SHA256SUMS`, and `build-provenance.json`;
-- passes `sha256sum -c SHA256SUMS` after download.
+The release is done when this run succeeds. Candidates expire after 14 days; if yours has expired, run a new build instead.
 
 Never replace or retag an existing release. Create the next package revision instead.
+
+## Trial builds
+
+To check an ORT upgrade or packaging change before merging, run [Build release candidate](https://github.com/ente/ort-packaging/actions/workflows/build.yml) on your branch, choosing `trial` instead of `release`, and the affected platform or `all`. Trials use the release build scripts and may reuse an existing package revision, but they never produce a publishable candidate.
+
+```sh
+gh workflow run build.yml \
+  --repo ente/ort-packaging \
+  --ref your-branch \
+  -f mode=trial \
+  -f platform=linux \
+  -f ort_version=1.28.1 \
+  -f package_revision=1
+```
 
 ## Packages
 
@@ -100,7 +100,7 @@ For Linux and Windows, register the shared WebGPU plugin and select an EP device
 - `scripts/`: workflow implementation helpers for platform builds, packaging, and packaged-runtime smoke tests
 - `patches/`: reviewable upstream compatibility patches; see [`PATCHES.md`](PATCHES.md)
 - `tests/`: portable packaged-runtime inference smoke tests and release-script regression tests
-- [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md): required stable-release promotion steps
+- [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md): manual checks required before publishing a stable release
 - `.github/workflows/build.yml`: version-driven native build and release-candidate assembly
 - `.github/workflows/publish.yml`: immutable publication of one successful build run
 
@@ -112,7 +112,9 @@ The build workflow builds every target on its native GitHub-hosted runner. Linux
 
 ## Verification and provenance
 
-Every binary asset includes a `.sha256` checksum and `.manifest.env` file. Manifests record the upstream ref and commit, packaging commit, telemetry policy, package channel/revision/label, target, provider topology, and build configuration. The release also includes `SHA256SUMS` and `build-provenance.json`.
+Every binary asset includes a `.sha256` checksum and `.manifest.env` file. Manifests record the upstream ref and commit, packaging commit, telemetry policy, package channel/revision/label, target, provider topology, and build configuration. The release also includes `SHA256SUMS` and `build-provenance.json`, for 35 assets in total: 11 packages, their 11 checksum sidecars, their 11 manifests, and those two files.
+
+A release build runs only for all platforms on `main`, and only after **Validate** succeeded on a push of that commit. Publication accepts only a successful `build.yml` run from this repository's `main` branch. It revalidates the candidate provenance, checksums, telemetry policy, upstream commit, package revision, and target tag before creating an immutable release from the exact packaging commit that produced the candidate. It then confirms that the published release is immutable, has all 35 assets, and has its tag on that commit.
 
 Custom-built binaries are stripped of or packaged without debug-symbol data. Linux and Android builds additionally reject debug/symbol-table sections and executable stacks. Archives contain the ONNX Runtime licence and third-party notices; Android AARs store them under `META-INF/`. Windows archives include the licence files shipped with the pinned DXC runtime.
 
@@ -120,8 +122,8 @@ Always pin a release tag and verify its checksum sidecar downstream.
 
 ## Validation scope
 
-CI verifies package structure, native architectures, required exports, Android JNI contents, checksums, provenance metadata, and packaged runtime loading. It requires CPU and WebGPU inference on Linux x64/ARM64 using Mesa's software Vulkan driver. Windows requires CPU inference and WebGPU plugin registration; D3D12 inference may be skipped when the runner has no GPU device, as reported in the job log. It requires CPU and CoreML inference without CPU fallback on macOS x64/ARM64 and in an ARM64 iOS Simulator, plus packaged CPU inference in an Android x86_64 emulator. Numeric checks reject NaN and infinity.
+CI verifies package structure, native architectures, required exports, Android JNI contents, checksums, provenance metadata, and packaged runtime loading. It requires CPU and WebGPU inference on Linux x64/ARM64 using Mesa's software Vulkan driver. Windows requires CPU inference and WebGPU plugin registration; D3D12 inference is skipped when the runner has no GPU device, as on both Windows runners for 1.31.0-r1, and no manual release check replaces it. It requires CPU and CoreML inference without CPU fallback on macOS x64/ARM64 and in an ARM64 iOS Simulator, plus packaged CPU inference in an Android x86_64 emulator. Numeric checks reject NaN and infinity.
 
-Hosted Android emulators cannot exercise WebGPU without a host GPU. Android WebGPU and Android ARM device ABIs require representative physical-device validation before a stable release; iOS device-slice and vendor-GPU performance validation are also downstream release criteria. Smoke tests prove runtime loading and basic provider inference, not application-specific operator coverage or performance.
+Hosted Android emulators cannot exercise WebGPU without a host GPU. Android WebGPU and Android ARM device ABIs require representative physical-device validation before a stable release; iOS device-slice and vendor-GPU performance validation are also required before publishing. Smoke tests prove runtime loading and basic provider inference, not application-specific operator coverage or performance.
 
 ONNX Runtime and bundled third-party components retain their upstream licences. Runtime archives include the applicable licence and notices.
