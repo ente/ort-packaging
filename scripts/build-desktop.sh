@@ -152,7 +152,7 @@ if [[ "$target" == macos-* ]]; then
       die "macOS runtime still contains DWARF sections after stripping: $library"
     fi
     codesign --force --sign - "$library"
-    file_type="$(file "$library")"
+    file_type="$(file -b "$library")"
     grep -q "$expected_arch" <<<"$file_type" || die "unexpected macOS binary architecture: $library"
   done < <(find "$dist_dir/package" -type f -name '*.dylib' -print0)
 
